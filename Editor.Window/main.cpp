@@ -17,10 +17,10 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,     //프로그램의 인스턴스 핸들
+                     _In_opt_ HINSTANCE hPrevInstance, // 바로앞에 실행된 현재 프로그램의 인스턴스 핸들, 없을경우 NULL, 지금은 신경쓰지 않아도 되는 행
+                     _In_ LPWSTR    lpCmdLine,      //명령행으로 입력된 프로그램 인수
+                     _In_ int       nCmdShow)       //프로그램이 실행될 형태이며, 보통 모양정보등이 전달된다.
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
@@ -100,7 +100,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+      0, 0, 1600, 900, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -125,6 +125,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    HDC hdc;
+    //SetTextAlign(hdc, TA_CENTER); // 가운데 정렬
+    PAINTSTRUCT ps;
+    static TCHAR str[256] = { 0, };
+    int strLen;
     switch (message)
     {
     case WM_COMMAND:
@@ -132,7 +137,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             int wmId = LOWORD(wParam);
             // 메뉴 선택을 구문 분석합니다:
             switch (wmId)
-            {
+            {            
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
@@ -144,12 +149,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
+    case WM_CHAR:
+    {
+        strLen = _tcslen(str);
+        str[strLen] = (TCHAR)wParam;
+        str[strLen + 1] = '\0';
+        InvalidateRect(hWnd, NULL, FALSE);
+        return 0;
+    }
+    case WM_KEYDOWN:
+    {
+        //hdc = GetDC(hWnd);
+        //SetTextAlign(hdc, TA_CENTER); // 가운데 정렬, 한번 출력되고 난후 초기값(왼쪽정렬로) 초기화 진행
+        //TextOut(hdc, 100, 100, TEXT("Hello"), _tcslen(TEXT("Hello")));
+        //ReleaseDC(hWnd, hdc);
+        //return 0;
+        //글씨가 출력되는것처럼 보이나, 출력된 정보가 따로 저장되지 않음
+        //따라서 윈도우의 화면이 출력범위를 벗어날경우 그림정보가 지워지게 됨
+        //이것을 방지하기 위해 WM_PAINT를 활용하여 그림정보를 저장함
+        
+    }
     case WM_PAINT:
         {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
+        //DC란 화면 출력에 필요한 모든 정보를 가지는 데이터 구조체
+        //GDI 모듈에 의해 관리된다.
+        //어떤 폰트, 어떤 선의 굵기를 정해줄건가, 어떤 색상을 그려줄건가
+        //화면 출력에 필요한 모든 경우는 win api에선 DC를 통해 그려줄수 있다.
+            
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
-            EndPaint(hWnd, &ps);
+        hdc = BeginPaint(hWnd, &ps);
+        TextOut(hdc, 100, 100, str, _tcslen(str));
+        EndPaint(hWnd, &ps);
+        return 0;
         }
         break;
     case WM_DESTROY:
