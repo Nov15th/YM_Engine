@@ -24,6 +24,15 @@
     <Image Include="Editor.Window.ico">
       <Filter>리소스 파일</Filter>
     </Image>
+    <Image Include="아이콘.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="icon1.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="icon2.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />

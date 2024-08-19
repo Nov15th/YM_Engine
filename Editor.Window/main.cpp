@@ -1,10 +1,20 @@
 ﻿// Editor.Window.cpp : 애플리케이션에 대한 진입점을 정의합니다.
 //
 
+
+
 #include "framework.h"
 #include "Editor.Window.h"
+#include "resource.h"
+#include <iostream>
+
+using namespace std;
 
 #define MAX_LOADSTRING 100
+
+//#pragma comment (linker, "/entry:WinMainCRTStartup /subsystem:console")
+#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console")
+
 
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
@@ -16,6 +26,18 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+
+bool isDrawing = false;
+static int startX, startY;
+static int oldX, oldY;
+
+void DrawLine(HDC hdc, int startX, int startY, int endX, int endY)
+{
+    MoveToEx(hdc, startX, startY, NULL);
+    LineTo(hdc, endX, endY);
+}
+
+//int MessageBox(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,     //프로그램의 인스턴스 핸들
                      _In_opt_ HINSTANCE hPrevInstance, // 바로앞에 실행된 현재 프로그램의 인스턴스 핸들, 없을경우 NULL, 지금은 신경쓰지 않아도 되는 행
@@ -75,12 +97,12 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.cbClsExtra     = 0;
     wcex.cbWndExtra     = 0;
     wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_EDITORWINDOW));
+    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(MY_ICON));
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_EDITORWINDOW);
+    wcex.hbrBackground  = (HBRUSH)GetStockObject(WHITE_BRUSH);
+    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDR_MENU1);
     wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
 
     return RegisterClassExW(&wcex);
 }
@@ -125,28 +147,49 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    
     HDC hdc;
     //SetTextAlign(hdc, TA_CENTER); // 가운데 정렬
     PAINTSTRUCT ps;
     static TCHAR str[256] = { 0, };
     int strLen;
+    
+    
     switch (message)
     {
+    
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
             // 메뉴 선택을 구문 분석합니다:
+            //switch (wmId)
+            //{            
+            //case IDM_ABOUT:
+            //    DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            //    break;
+            //case IDM_EXIT:
+            //    DestroyWindow(hWnd);
+            //    break;
+            //case ID_FILE_INFO:
+            //default:
+            //    return DefWindowProc(hWnd, message, wParam, lParam);
+            //}
             switch (wmId)
-            {            
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            {
+            case ID_FILE_EXIT:
+                if (MessageBox(hWnd, TEXT("정말로 종료하시겠습니까?"), TEXT("경고"), MB_YESNO | MB_ICONWARNING) == IDYES)
+                {
+                    DestroyWindow(hWnd);
+                }
                 break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
+            case ID_VER1_VER1:
+                MessageBox(hWnd, TEXT("버전 1.1 입니다."), TEXT("정보"), MB_OK | MB_ICONINFORMATION);
                 break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
+            case ID_INFO_VER2:
+                MessageBox(hWnd, TEXT("현재 버전은 준비 중입니다."), TEXT("에러"), MB_OK | MB_ICONERROR);
+                break;
             }
+            return 0;
         }
         break;
     case WM_CHAR:
@@ -155,6 +198,49 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         str[strLen] = (TCHAR)wParam;
         str[strLen + 1] = '\0';
         InvalidateRect(hWnd, NULL, FALSE);
+        return 0;
+    }
+    case WM_LBUTTONDOWN:
+    {
+        isDrawing = true;
+        startX = LOWORD(lParam);
+        startY = HIWORD(lParam);
+
+        oldX = startX;
+        oldY = startY;
+        return 0;
+      
+    }
+    case WM_MOUSEMOVE:
+    {
+        if (isDrawing == false)
+        {
+            return 0;
+        }
+        HDC hdc = GetDC(hWnd);
+
+        int nowX = LOWORD(lParam);
+        int nowY = HIWORD(lParam);
+
+        // 이전에 그렸던 직선을 배경색으로 다시 그려줌
+        HPEN oldPen = (HPEN)SelectObject(hdc, GetStockObject(WHITE_PEN));
+        MoveToEx(hdc, startX, startY, NULL);
+        LineTo(hdc, oldX, oldY);
+
+        // 새로운 직선은 검은색으로 그림
+        SelectObject(hdc, oldPen);
+        MoveToEx(hdc, startX, startY, NULL);
+        LineTo(hdc, nowX, nowY);
+
+        oldX = nowX;
+        oldY = nowY;
+
+        ReleaseDC(hWnd, hdc);
+        return 0;
+    }
+    case WM_LBUTTONUP:
+    {
+        isDrawing = false;
         return 0;
     }
     case WM_KEYDOWN:
@@ -202,6 +288,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         return (INT_PTR)TRUE;
 
     case WM_COMMAND:
+
         if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
         {
             EndDialog(hDlg, LOWORD(wParam));
