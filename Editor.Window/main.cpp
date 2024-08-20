@@ -6,8 +6,9 @@
 #include "framework.h"
 #include "Editor.Window.h"
 #include "resource.h"
-#include <iostream>
-
+#include <Windows.h>
+#include <random>
+#include <time.h>
 using namespace std;
 
 #define MAX_LOADSTRING 100
@@ -18,6 +19,7 @@ using namespace std;
 
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
+
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
 WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
 
@@ -27,9 +29,15 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
-bool isDrawing = false;
-static int startX, startY;
-static int oldX, oldY;
+typedef struct {
+    COLORREF color;
+    POINT pos;
+    POINT velocity;
+    int radius;
+} ball_t;
+
+ball_t balls[500];
+int ball_size = sizeof(balls) / sizeof(balls[0]);
 
 void DrawLine(HDC hdc, int startX, int startY, int endX, int endY)
 {
@@ -48,7 +56,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,     //프로그램의 인스턴�
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     //깃허브 테스트
-
+    
     // TODO: 여기에 코드를 입력합니다.
 
     // 전역 문자열을 초기화합니다.
@@ -88,6 +96,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,     //프로그램의 인스턴�
 //
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
+    //윈도우 클래스 생성
     WNDCLASSEXW wcex;
 
     wcex.cbSize = sizeof(WNDCLASSEX);
@@ -103,7 +112,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDR_MENU1);
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
-
+    
+    //레지스터 등록
     return RegisterClassExW(&wcex);
 }
 
@@ -120,7 +130,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
-
+   //윈도우 핸들 생성 및 받아오기
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
       0, 0, 1600, 900, nullptr, nullptr, hInstance, nullptr);
 
@@ -128,7 +138,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    {
       return FALSE;
    }
-
+   //윈도우 띄우기
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
 
@@ -145,19 +155,78 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //  WM_DESTROY  - 종료 메시지를 게시하고 반환합니다.
 //
 //
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     
-    HDC hdc;
-    //SetTextAlign(hdc, TA_CENTER); // 가운데 정렬
-    PAINTSTRUCT ps;
-    static TCHAR str[256] = { 0, };
-    int strLen;
-    
-    
     switch (message)
     {
-    
+    case WM_CREATE:
+        srand((unsigned int)time(NULL));
+        RECT clientRect;
+        GetClientRect(hWnd, &clientRect);
+
+        for (int i = 0; i < ball_size; ++i)
+        {
+            // 랜덤 위치에서 생성
+            balls[i].pos.x = rand() % clientRect.right;
+            balls[i].pos.y = rand() % clientRect.bottom;
+
+            // +- (1 ~ 5) 사이의 랜덤 속도로 설정
+            balls[i].velocity.x = (rand() % 5 + 1) * (rand() % 2 == 0 ? -1 : 1);
+            balls[i].velocity.y = (rand() % 5 + 1) * (rand() % 2 == 0 ? -1 : 1);
+
+            // 공의 크기 (10, 15 ... ~ 30) 까지 간격 5씩 랜덤으로 설정
+            balls[i].radius = rand() % 5 * 5 + 10;
+
+            // 공 색깔 랜덤으로 설정
+            balls[i].color = RGB(rand() % 255, rand() % 255, rand() % 255);
+        }
+
+        // 0.025초 간격으로 타이머 설정
+        SetTimer(hWnd, 1, 25, NULL);
+        break;
+    case WM_TIMER:
+    {
+        RECT clientRect;
+        GetClientRect(hWnd, &clientRect);
+        for (int i = 0; i < ball_size; ++i)
+        {
+            // 충돌하면 위치 조정하고, 방향 반전시킴
+            {
+                // 왼쪽 충돌
+                if (balls[i].pos.x <= balls[i].radius)
+                {
+                    balls[i].pos.x = balls[i].radius;
+                    balls[i].velocity.x *= -1;
+                }
+                // 오른쪽 충돌
+                if (balls[i].pos.x >= clientRect.right - balls[i].radius)
+                {
+                    balls[i].pos.x = clientRect.right - balls[i].radius;
+                    balls[i].velocity.x *= -1;
+                }
+                // 위쪽 충돌
+                if (balls[i].pos.y <= balls[i].radius)
+                {
+                    balls[i].pos.y = balls[i].radius;
+                    balls[i].velocity.y *= -1;
+                }
+                // 아래쪽 충돌
+                if (balls[i].pos.y >= clientRect.bottom - balls[i].radius)
+                {
+                    balls[i].pos.y = clientRect.bottom - balls[i].radius;
+                    balls[i].velocity.y *= -1;
+                }
+            }
+
+            // 정해진 방향으로 공 이동
+            balls[i].pos.x += balls[i].velocity.x;
+            balls[i].pos.y += balls[i].velocity.y;
+        }
+        InvalidateRect(hWnd, NULL, FALSE);
+        break;
+    }
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
@@ -192,84 +261,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             return 0;
         }
         break;
-    case WM_CHAR:
-    {
-        strLen = _tcslen(str);
-        str[strLen] = (TCHAR)wParam;
-        str[strLen + 1] = '\0';
-        InvalidateRect(hWnd, NULL, FALSE);
-        return 0;
-    }
-    case WM_LBUTTONDOWN:
-    {
-        isDrawing = true;
-        startX = LOWORD(lParam);
-        startY = HIWORD(lParam);
-
-        oldX = startX;
-        oldY = startY;
-        return 0;
-      
-    }
-    case WM_MOUSEMOVE:
-    {
-        if (isDrawing == false)
-        {
-            return 0;
-        }
-        HDC hdc = GetDC(hWnd);
-
-        int nowX = LOWORD(lParam);
-        int nowY = HIWORD(lParam);
-
-        // 이전에 그렸던 직선을 배경색으로 다시 그려줌
-        HPEN oldPen = (HPEN)SelectObject(hdc, GetStockObject(WHITE_PEN));
-        MoveToEx(hdc, startX, startY, NULL);
-        LineTo(hdc, oldX, oldY);
-
-        // 새로운 직선은 검은색으로 그림
-        SelectObject(hdc, oldPen);
-        MoveToEx(hdc, startX, startY, NULL);
-        LineTo(hdc, nowX, nowY);
-
-        oldX = nowX;
-        oldY = nowY;
-
-        ReleaseDC(hWnd, hdc);
-        return 0;
-    }
-    case WM_LBUTTONUP:
-    {
-        isDrawing = false;
-        return 0;
-    }
-    case WM_KEYDOWN:
-    {
-        //hdc = GetDC(hWnd);
-        //SetTextAlign(hdc, TA_CENTER); // 가운데 정렬, 한번 출력되고 난후 초기값(왼쪽정렬로) 초기화 진행
-        //TextOut(hdc, 100, 100, TEXT("Hello"), _tcslen(TEXT("Hello")));
-        //ReleaseDC(hWnd, hdc);
-        //return 0;
-        //글씨가 출력되는것처럼 보이나, 출력된 정보가 따로 저장되지 않음
-        //따라서 윈도우의 화면이 출력범위를 벗어날경우 그림정보가 지워지게 됨
-        //이것을 방지하기 위해 WM_PAINT를 활용하여 그림정보를 저장함
-        
-    }
+   
     case WM_PAINT:
+    {
+
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        HDC memDC = CreateCompatibleDC(hdc);
+        RECT clientRect;
+        GetClientRect(hWnd, &clientRect);
+        FillRect(memDC, &clientRect, (HBRUSH)GetStockObject(WHITE_BRUSH));
+        
+        HBITMAP memBitmap = CreateCompatibleBitmap(hdc, clientRect.right, clientRect.bottom);
+        HBITMAP rollbackBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
+        
+        // 공 그리기
+        for (int i = 0; i < ball_size; ++i)
         {
-        //DC란 화면 출력에 필요한 모든 정보를 가지는 데이터 구조체
-        //GDI 모듈에 의해 관리된다.
-        //어떤 폰트, 어떤 선의 굵기를 정해줄건가, 어떤 색상을 그려줄건가
-        //화면 출력에 필요한 모든 경우는 win api에선 DC를 통해 그려줄수 있다.
-            
-            // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
-        hdc = BeginPaint(hWnd, &ps);
-        TextOut(hdc, 100, 100, str, _tcslen(str));
-        EndPaint(hWnd, &ps);
-        return 0;
+            // 공 색깔의 브러쉬 생성 및 선택
+            SelectObject(memDC, GetStockObject(DC_BRUSH));
+            SetDCBrushColor(memDC, balls[i].color);
+
+            // x, y를 중점으로 한 원 출력
+            Ellipse(memDC, balls[i].pos.x - balls[i].radius, balls[i].pos.y - balls[i].radius,
+                balls[i].pos.x + balls[i].radius, balls[i].pos.y + balls[i].radius);
         }
+
+        BitBlt(hdc, 0, 0, clientRect.right, clientRect.bottom, memDC, 0, 0, SRCCOPY);
+
+        DeleteObject(SelectObject(memDC, rollbackBitmap));
+        DeleteDC(memDC);
+
+
+        EndPaint(hWnd, &ps);
+
+
+        
+    
         break;
+    }
     case WM_DESTROY:
+        KillTimer(hWnd, 1);
         PostQuitMessage(0);
         break;
     default:
